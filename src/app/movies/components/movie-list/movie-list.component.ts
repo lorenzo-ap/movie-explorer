@@ -2,10 +2,10 @@ import { Component, computed, inject, input, numberAttribute } from '@angular/co
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 import { EMPTY, catchError, switchMap } from 'rxjs';
-import { PaginationComponent } from '../../shared/pagination/pagination.component';
+import { PaginationComponent } from '../../../shared/components/pagination/pagination.component';
 import { MovieCardComponent } from '../movie-card/movie-card.component';
 import { MovieSearchComponent } from '../movie-search/movie-search.component';
-import { MovieService } from '../movie.service';
+import { MovieService } from '../../services/movie.service';
 
 @Component({
   imports: [MovieCardComponent, MovieSearchComponent, PaginationComponent],

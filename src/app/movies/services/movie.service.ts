@@ -1,9 +1,9 @@
 import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
 import { Observable, catchError, finalize, tap, throwError } from 'rxjs';
-import { environment } from '../../environments/environment';
-import { PaginatedResponse } from '../shared/models/paginated-response';
-import { Movie, MovieDetails } from './movie.model';
+import { environment } from '../../../environments/environment';
+import { PaginatedResponse } from '../../shared/models/paginated-response.model';
+import { Movie, MovieDetails } from '../models/movie.model';
 
 @Injectable({
   providedIn: 'root',

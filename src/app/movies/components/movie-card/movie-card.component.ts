@@ -1,7 +1,7 @@
 import { Component, computed, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { environment } from '../../../environments/environment';
-import { Movie } from '../movie.model';
+import { environment } from '../../../../environments/environment';
+import { Movie } from '../../models/movie.model';
 
 @Component({
   imports: [RouterLink],

@@ -3,8 +3,8 @@ import { Component, computed, inject, input, numberAttribute } from '@angular/co
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 import { EMPTY, catchError, switchMap } from 'rxjs';
-import { environment } from '../../../environments/environment';
-import { MovieService } from '../movie.service';
+import { environment } from '../../../../environments/environment';
+import { MovieService } from '../../services/movie.service';
 
 @Component({
   imports: [DatePipe, DecimalPipe],
