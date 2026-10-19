@@ -33,4 +33,10 @@
       <li class="col-span-full py-20 text-center text-slate-400">No movies found.</li>
     }
   </ul>
+
+  <app-pagination
+    [currentPage]="currentPage()"
+    [totalPages]="totalPages()"
+    (pageChange)="onPageChange($event)"
+  />
 }
