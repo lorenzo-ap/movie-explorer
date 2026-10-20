@@ -4,12 +4,12 @@ A web application for browsing and searching movies, built with Angular 22, Sign
 
 ## Features
 
-- Popular movies list with pagination
+- Popular movies list
 - Live search: results update while typing (debounced), the **Search** button searches immediately
 - Clearing the search returns to popular movies
 - Movie details page: poster, title, overview, genres, rating and release date
 - Back button that returns to the previous results, or to the home page when the details page was opened directly
-- Search query and page are stored in the URL, so results survive a refresh, the browser Back button and can be shared
+- The search query is stored in the URL, so results survive a refresh, the browser Back button and can be shared
 - Loading, error, empty and not found states
 - Responsive layout from mobile to desktop
 
@@ -55,31 +55,30 @@ src/app
 │   └── interceptors          tmdb-auth-interceptor: adds the Bearer token to TMDb requests
 ├── movies
 │   ├── components
-│   │   ├── movie-list        page: search, results grid, pagination
+│   │   ├── movie-list        page: search, results grid
 │   │   ├── movie-search      search input and button
 │   │   ├── movie-card        single movie in the grid
 │   │   └── movie-detail      page: movie details
 │   ├── models                Movie, MovieDetails, Genre
-│   └── services              MovieService: TMDb requests and state
+│   ├── repositories          MovieRepository: TMDb HTTP calls
+│   └── services              MovieService: state (signals) and error handling
 └── shared
-    ├── components
-    │   └── pagination        reusable previous / next pagination
     └── models                PaginatedResponse<T>
 ```
 
 ## Technical decisions
 
-**State in signals.** `MovieService` keeps `movies`, `movieDetails`, `loading`, `error`, `currentPage` and `totalPages` in private writable signals and exposes them as read-only signals. Only the service changes the state; components read it.
+**State in signals.** `MovieService` keeps `movies`, `loading` and `error` for the list and `movieDetail`, `detailLoading` and `detailError` for the details page in private writable signals and exposes them as read-only signals. List and details state are separate. Only the service changes the state; components read it.
 
-**The service returns Observables.** `getPopularMovies()`, `searchMovies()` and `getMovieDetails()` update the signals through `tap` / `catchError` / `finalize` and return the request, so the caller decides when to subscribe and when to cancel.
+**Repository and service.** `MovieRepository` only does the HTTP calls and maps TMDb responses to `Movie[]` / `MovieDetails`. `MovieService` updates the signals through `tap` / `catchError` / `finalize`, maps errors to user-facing messages by status (network, 401, 404, or a fallback per method) and returns `[]` / `null` instead of rethrowing. It returns the Observable, so the caller decides when to subscribe and when to cancel.
 
-**Cancelling outdated requests.** The list and details pages turn their inputs into a stream with `toObservable` and use `switchMap`, so a slower old response can never overwrite a newer one. `catchError` is placed on the inner request, so one failed request does not stop the stream.
+**Cancelling outdated requests.** The list page turns its query input into a stream with `toObservable` and uses `switchMap` on the trimmed query, so a slower old response can never overwrite a newer one. The details page loads once in `ngOnInit`, because its id cannot change while it is displayed.
 
-**The URL holds the search state.** The search query and page live in the URL (`/?query=batman&page=2`) and are bound to component inputs with `withComponentInputBinding()`. Typing, the Search button, pagination, refresh and browser navigation all go through the same path.
+**The URL holds the search state.** The search query lives in the URL (`/?query=batman`) and is bound to a component input with `withComponentInputBinding()`. Typing, the Search button, refresh and browser navigation all go through the same path.
 
 **Debounced search.** Typing emits after 400 ms without input; submitting the form emits immediately. Typing uses `replaceUrl` so it does not fill the browser history.
 
-**Container and presentational components.** `MovieListComponent` and `MovieDetailComponent` talk to the service and the router. `MovieCardComponent`, `MovieSearchComponent` and `PaginationComponent` only receive inputs and emit outputs, which keeps them reusable and easy to test.
+**Container and presentational components.** `MovieListComponent` and `MovieDetailComponent` talk to the service and the router. `MovieCardComponent` and `MovieSearchComponent` only receive inputs and emit outputs, which keeps them reusable and easy to test.
 
 **Authentication in an interceptor.** The TMDb token is added by a functional HTTP interceptor, only for requests to the TMDb API.
 
@@ -87,7 +86,9 @@ src/app
 
 ## Tests
 
-`MovieService` is covered with `HttpTestingController`: popular movies, search parameters, pagination, the 500 page limit, error messages for network, 401 and 404 errors, and movie details.
+`MovieRepository` is tested with `HttpTestingController`: request URLs, the search query parameter, mapping to results and error propagation.
+
+`MovieService` is tested with a mocked repository: state signals, loading, separate list and details state, error messages, and observables that complete with `[]` / `null` instead of throwing.
 
 ```bash
 pnpm test --watch=false
@@ -96,5 +97,4 @@ pnpm test --watch=false
 ## Notes
 
 - This is a frontend-only application, so the TMDb token is part of the JavaScript bundle that is sent to the browser. In a production app the requests would go through a backend proxy that keeps the token on the server.
-- TMDb allows at most 500 pages per list, so pagination is limited to 500 pages.
 - TMDb may be unavailable in some regions without a VPN.
