@@ -2,6 +2,8 @@
 
 A web application for browsing and searching movies, built with Angular 22, Signals and Tailwind CSS on top of [The Movie Database (TMDb) API](https://developer.themoviedb.org/docs).
 
+**Live demo:** _link will be added after the first deployment_
+
 ## Features
 
 - Popular movies list
@@ -40,12 +42,25 @@ Open `src/environments/environment.ts` and paste your API Read Access Token into
 
 ### Scripts
 
-| Command       | Description                                   |
-| ------------- | --------------------------------------------- |
-| `pnpm start`  | Start the dev server on http://localhost:4200 |
-| `pnpm build`  | Production build into `dist/movie-explorer`   |
-| `pnpm test`   | Run unit tests                                |
-| `pnpm format` | Format the source code with Prettier          |
+| Command        | Description                                                          |
+| -------------- | -------------------------------------------------------------------- |
+| `pnpm start`   | Start the dev server on http://localhost:4200                        |
+| `pnpm build`   | Production build into `dist/movie-explorer`                          |
+| `pnpm test`    | Run unit tests                                                       |
+| `pnpm format`  | Format the source code with Prettier                                 |
+| `pnpm set-env` | Generate `environment.ts` from the `TMDB_TOKEN` environment variable |
+
+## Deployment
+
+The app is deployed on Vercel from the GitHub repository. Every push to `main` deploys to production, and pull requests get preview deployments.
+
+1. Import the repository in Vercel.
+2. Add the `TMDB_TOKEN` environment variable (your TMDb API Read Access Token) for the Production and Preview environments.
+3. Deploy. The build settings come from `vercel.json`.
+
+`environment.ts` is git-ignored, so `scripts/set-env.mjs` creates it from `TMDB_TOKEN` at build time. Locally, the existing file is kept.
+
+`vercel.json` rewrites all routes to `index.html`, so direct links and refreshes on `/movie/:id` work.
 
 ## Project structure
 
@@ -96,5 +111,5 @@ pnpm test --watch=false
 
 ## Notes
 
-- This is a frontend-only application, so the TMDb token is part of the JavaScript bundle that is sent to the browser. In a production app the requests would go through a backend proxy that keeps the token on the server.
+- This is a frontend-only application, so the TMDb token is part of the JavaScript bundle that is sent to the browser (the same applies to the Vercel deployment). In a production app the requests would go through a backend proxy that keeps the token on the server.
 - TMDb may be unavailable in some regions without a VPN.

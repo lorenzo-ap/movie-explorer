@@ -1,0 +1,8 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "angular",
+  "installCommand": "pnpm install --frozen-lockfile",
+  "buildCommand": "node scripts/set-env.mjs && pnpm build",
+  "outputDirectory": "dist/movie-explorer/browser",
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+}
