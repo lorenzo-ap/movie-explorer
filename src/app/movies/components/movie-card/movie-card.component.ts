@@ -13,7 +13,6 @@ export class MovieCardComponent {
 
   readonly posterUrl = computed(() => {
     const posterPath = this.movie().poster_path;
-
     return posterPath ? `${environment.tmdbImageUrl}/w342${posterPath}` : null;
   });
 }

@@ -14,6 +14,7 @@
       ></div>
     </div>
   }
+
   @case ('error') {
     <p
       class="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-center text-red-400"
@@ -22,6 +23,7 @@
       {{ error() }}
     </p>
   }
+
   @case ('loaded') {
     @if (movie(); as movie) {
       <article class="grid gap-8 md:grid-cols-[300px_1fr] lg:grid-cols-[360px_1fr]">
