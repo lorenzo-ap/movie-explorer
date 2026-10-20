@@ -1,9 +1,8 @@
-import { HttpErrorResponse, provideHttpClient } from '@angular/common/http';
-import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { HttpErrorResponse } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
-import { environment } from '../../../environments/environment';
-import { PaginatedResponse } from '../../shared/models/paginated-response.model';
+import { of, Subject, throwError } from 'rxjs';
 import { Movie, MovieDetails } from '../models/movie.model';
+import { MovieRepository } from '../repositories/movie.repository';
 import { MovieService } from './movie.service';
 
 const movie: Movie = {
@@ -20,114 +19,197 @@ const movieDetails: MovieDetails = {
   genres: [{ id: 28, name: 'Action' }],
 };
 
-function createResponse(
-  overrides: Partial<PaginatedResponse<Movie>> = {},
-): PaginatedResponse<Movie> {
-  return { page: 1, results: [movie], total_pages: 1, total_results: 1, ...overrides };
-}
+const httpError = (status: number) => throwError(() => new HttpErrorResponse({ status }));
 
 describe('MovieService', () => {
-  const apiUrl = environment.tmdbApiUrl;
   let service: MovieService;
-  let httpTesting: HttpTestingController;
+  const repository = {
+    getPopular: vi.fn(),
+    search: vi.fn(),
+    getById: vi.fn(),
+  };
 
   beforeEach(() => {
+    vi.resetAllMocks();
+
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: [{ provide: MovieRepository, useValue: repository }],
     });
 
     service = TestBed.inject(MovieService);
-    httpTesting = TestBed.inject(HttpTestingController);
   });
 
-  afterEach(() => {
-    httpTesting.verify();
+  describe('getPopularMovies', () => {
+    it('sets the movies and clears the error', () => {
+      repository.getPopular.mockReturnValue(of([movie]));
+
+      let result: Movie[] | undefined;
+      service.getPopularMovies().subscribe((movies) => (result = movies));
+
+      expect(result).toEqual([movie]);
+      expect(service.movies()).toEqual([movie]);
+      expect(service.error()).toBeNull();
+    });
+
+    it('is loading while the request is in flight and not afterwards', () => {
+      const response = new Subject<Movie[]>();
+      repository.getPopular.mockReturnValue(response);
+
+      service.getPopularMovies().subscribe();
+      expect(service.loading()).toBe(true);
+
+      response.next([movie]);
+      response.complete();
+      expect(service.loading()).toBe(false);
+    });
+
+    it('completes with an empty list and sets the error on failure', () => {
+      repository.getPopular.mockReturnValue(httpError(500));
+
+      let result: Movie[] | undefined;
+      let completed = false;
+      service.getPopularMovies().subscribe({
+        next: (movies) => (result = movies),
+        complete: () => (completed = true),
+      });
+
+      expect(result).toEqual([]);
+      expect(completed).toBe(true);
+      expect(service.error()).toBe('Failed to load popular movies.');
+      expect(service.loading()).toBe(false);
+    });
+
+    it('clears a previous error when a new request starts', () => {
+      repository.getPopular.mockReturnValueOnce(httpError(500));
+      service.getPopularMovies().subscribe();
+      expect(service.error()).not.toBeNull();
+
+      const response = new Subject<Movie[]>();
+      repository.getPopular.mockReturnValueOnce(response);
+      service.getPopularMovies().subscribe();
+
+      expect(service.error()).toBeNull();
+    });
   });
 
-  it('loads popular movies and updates the state', () => {
-    service.getPopularMovies().subscribe();
+  describe('searchMovies', () => {
+    it('passes the keyword to the repository and sets the movies', () => {
+      repository.search.mockReturnValue(of([movie]));
 
-    expect(service.loading()).toBe(true);
+      service.searchMovies('inception').subscribe();
 
-    const request = httpTesting.expectOne((req) => req.url === `${apiUrl}/movie/popular`);
-    expect(request.request.params.get('page')).toBe('1');
+      expect(repository.search).toHaveBeenCalledWith('inception');
+      expect(service.movies()).toEqual([movie]);
+      expect(service.loading()).toBe(false);
+      expect(service.error()).toBeNull();
+    });
 
-    request.flush(createResponse({ total_pages: 3 }));
+    it('completes with an empty list and sets the error on failure', () => {
+      repository.search.mockReturnValue(httpError(500));
 
-    expect(service.movies()).toEqual([movie]);
-    expect(service.currentPage()).toBe(1);
-    expect(service.totalPages()).toBe(3);
-    expect(service.loading()).toBe(false);
-    expect(service.error()).toBeNull();
+      let result: Movie[] | undefined;
+      service.searchMovies('inception').subscribe((movies) => (result = movies));
+
+      expect(result).toEqual([]);
+      expect(service.error()).toBe('Failed to search movies.');
+      expect(service.loading()).toBe(false);
+    });
   });
 
-  it('searches movies with a trimmed keyword and the requested page', () => {
-    service.searchMovies('  inception  ', 2).subscribe();
+  describe('getMovieDetails', () => {
+    it('sets the movie detail', () => {
+      repository.getById.mockReturnValue(of(movieDetails));
 
-    const request = httpTesting.expectOne((req) => req.url === `${apiUrl}/search/movie`);
-    expect(request.request.params.get('query')).toBe('inception');
-    expect(request.request.params.get('page')).toBe('2');
+      let result: MovieDetails | null | undefined;
+      service.getMovieDetails(27205).subscribe((details) => (result = details));
 
-    request.flush(createResponse({ page: 2, total_pages: 4 }));
+      expect(repository.getById).toHaveBeenCalledWith(27205);
+      expect(result).toEqual(movieDetails);
+      expect(service.movieDetail()).toEqual(movieDetails);
+      expect(service.detailLoading()).toBe(false);
+      expect(service.detailError()).toBeNull();
+    });
 
-    expect(service.currentPage()).toBe(2);
-    expect(service.totalPages()).toBe(4);
+    it('clears the previous detail and is loading while in flight', () => {
+      repository.getById.mockReturnValueOnce(of(movieDetails));
+      service.getMovieDetails(27205).subscribe();
+      expect(service.movieDetail()).toEqual(movieDetails);
+
+      const response = new Subject<MovieDetails>();
+      repository.getById.mockReturnValueOnce(response);
+      service.getMovieDetails(1).subscribe();
+
+      expect(service.movieDetail()).toBeNull();
+      expect(service.detailLoading()).toBe(true);
+
+      response.next({ ...movieDetails, id: 1 });
+      response.complete();
+      expect(service.detailLoading()).toBe(false);
+    });
+
+    it('completes with null and sets the detail error on failure', () => {
+      repository.getById.mockReturnValue(httpError(500));
+
+      let result: MovieDetails | null | undefined;
+      let completed = false;
+      service.getMovieDetails(27205).subscribe({
+        next: (details) => (result = details),
+        complete: () => (completed = true),
+      });
+
+      expect(result).toBeNull();
+      expect(completed).toBe(true);
+      expect(service.movieDetail()).toBeNull();
+      expect(service.detailError()).toBe('Failed to load movie details.');
+      expect(service.detailLoading()).toBe(false);
+    });
   });
 
-  it('limits total pages to the TMDb maximum of 500', () => {
-    service.getPopularMovies().subscribe();
+  describe('separate list and detail state', () => {
+    it('keeps list loading and error independent from detail state', () => {
+      repository.getPopular.mockReturnValue(new Subject<Movie[]>());
+      repository.getById.mockReturnValue(httpError(500));
 
-    httpTesting
-      .expectOne((req) => req.url === `${apiUrl}/movie/popular`)
-      .flush(createResponse({ total_pages: 48000 }));
+      service.getPopularMovies().subscribe();
+      service.getMovieDetails(27205).subscribe();
 
-    expect(service.totalPages()).toBe(500);
+      expect(service.loading()).toBe(true);
+      expect(service.error()).toBeNull();
+      expect(service.detailLoading()).toBe(false);
+      expect(service.detailError()).toBe('Failed to load movie details.');
+    });
+
+    it('does not touch detail state when the list request fails', () => {
+      repository.getPopular.mockReturnValue(httpError(500));
+
+      service.getPopularMovies().subscribe();
+
+      expect(service.error()).toBe('Failed to load popular movies.');
+      expect(service.detailError()).toBeNull();
+      expect(service.detailLoading()).toBe(false);
+    });
   });
 
-  it('sets an error message and rethrows when the request fails', () => {
-    let receivedError: HttpErrorResponse | undefined;
+  describe('error messages', () => {
+    const cases: [number, string][] = [
+      [0, 'Unable to connect to the server. Please check your connection.'],
+      [401, 'Invalid TMDb API credentials.'],
+      [404, 'The requested movie was not found.'],
+    ];
 
-    service.getPopularMovies().subscribe({ error: (error) => (receivedError = error) });
+    it.each(cases)('uses the status %i message for every method', (status, message) => {
+      repository.getPopular.mockReturnValue(httpError(status));
+      repository.search.mockReturnValue(httpError(status));
+      repository.getById.mockReturnValue(httpError(status));
 
-    httpTesting
-      .expectOne((req) => req.url === `${apiUrl}/movie/popular`)
-      .flush(null, { status: 401, statusText: 'Unauthorized' });
+      service.getPopularMovies().subscribe();
+      expect(service.error()).toBe(message);
 
-    expect(service.error()).toBe('Invalid TMDb API credentials.');
-    expect(service.loading()).toBe(false);
-    expect(receivedError?.status).toBe(401);
-  });
+      service.searchMovies('x').subscribe();
+      expect(service.error()).toBe(message);
 
-  it('sets a connection error message when the network fails', () => {
-    service.getPopularMovies().subscribe({ error: () => undefined });
-
-    httpTesting
-      .expectOne((req) => req.url === `${apiUrl}/movie/popular`)
-      .error(new ProgressEvent('error'));
-
-    expect(service.error()).toBe('Unable to connect to the server. Please check your connection.');
-  });
-
-  it('loads movie details', () => {
-    service.getMovieDetails(movie.id).subscribe();
-
-    expect(service.movieDetails()).toBeNull();
-    expect(service.loading()).toBe(true);
-
-    httpTesting.expectOne(`${apiUrl}/movie/${movie.id}`).flush(movieDetails);
-
-    expect(service.movieDetails()).toEqual(movieDetails);
-    expect(service.loading()).toBe(false);
-  });
-
-  it('sets a not found message when the movie does not exist', () => {
-    service.getMovieDetails(999).subscribe({ error: () => undefined });
-
-    httpTesting
-      .expectOne(`${apiUrl}/movie/999`)
-      .flush(null, { status: 404, statusText: 'Not Found' });
-
-    expect(service.error()).toBe('The requested movie was not found.');
-    expect(service.movieDetails()).toBeNull();
+      service.getMovieDetails(1).subscribe();
+      expect(service.detailError()).toBe(message);
+    });
   });
 });
