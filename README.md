@@ -2,7 +2,7 @@
 
 A web application for browsing and searching movies, built with Angular 22, Signals and Tailwind CSS on top of [The Movie Database (TMDb) API](https://developer.themoviedb.org/docs).
 
-**Live demo:** _link will be added after the first deployment_
+**Live demo:** https://movie-explorer-six-xi.vercel.app
 
 ## Features
 
